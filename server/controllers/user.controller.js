@@ -3,6 +3,8 @@ const bryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const userModel = require("../models/user.model");
 const sendToken = require("../utils/jwtToken");
+const crypto=require('crypto')
+const sendEmail = require("../utils/sendEmail");
 
 console.log(UserModel);
 
@@ -28,13 +30,13 @@ async function registerUser(req, res) {
       },
     });
     const token = user.getJWTToken();
-    console.log("Token",token);
+    console.log("Token", token);
     res.cookie("jwt", token, { expiresIn: process.env.JWT_EXPIRE });
 
     res.status(200).json({
       success: "true",
-      Token:token,
-      message:"Successfully Register",
+      Token: token,
+      message: "Successfully Register",
     });
   } catch (error) {
     console.log(error);
@@ -57,19 +59,19 @@ async function loginUser(req, res) {
         .status(404)
         .json({ message: `User does'not exist with this email` });
 
-   /* const isPasswordCorrect = await bryptjs.compare(
+    /* const isPasswordCorrect = await bryptjs.compare(
       password,
       existingUser.password
     );*/
 
-    const isPasswordCorrect= existingUser.comparePassword(password);
-    
+    const isPasswordCorrect = existingUser.comparePassword(password);
+
     console.log(isPasswordCorrect);
 
     if (!isPasswordCorrect)
       return res.status(400).json({ message: "Invalid password" });
 
-   /* const token = existingUser.getJWTToken();
+    /* const token = existingUser.getJWTToken();
     
     await jwt.sign(
       { id: existingUser._id },
@@ -84,31 +86,121 @@ async function loginUser(req, res) {
        message:"Successfully Logged in" ,
     });*/
 
-    sendToken(existingUser,200,res);
+    sendToken(existingUser, 200, res);
   } catch (error) {
-    console.log(error)
+    console.log(error);
     res.status(500).json({
-      message: error,
+      message: "Server error",
     });
   }
 }
 
-async function logOut(req,res,next){
-
-
-  res.cookie("token",null,{
-    expires:new Date(new Date().getTime()),
-    httpOnly:true,
-  })
+async function logOut(req, res, next) {
+  res.cookie("token", null, {
+    expires: new Date(new Date().getTime()),
+    httpOnly: true,
+  });
 
   res.status(200).json({
-    success:true,
-    message:"Logged Out",
+    success: true,
+    message: "Logged Out",
+  });
+}
+
+async function forgotPassword(req, res, next) {
+  console.log("User forgot password works");
+  const email = req.body.email;
+
+  const user = await UserModel.findOne({ email }).maxTime(2000);
+
+  if (!user)
+    return res.status(404).json({
+      message: "User not found with this email",
+    });
+
+  const resetToken = user.getResetPasswordToken();
+
+  await user.save({ validateBeforeSave: false });
+
+  const resetPasswordUrl = `${req.protocol}://${req.get(
+    "host"
+  )}/api/v1/password/reset/${resetToken}`;
+
+  const messege = `Your password reset Token is :-\n\n${resetPasswordUrl}\n\n If you have not requested this email then , please ignore it`;
+
+  await sendEmail({
+    email: user.email,
+    subject: `Ecommerce Password Recovery`,
+    messege,
+  });
+
+  try {
+    res.status(200).json({
+      message: `Email sent to ${user.email} successfully`,
+    });
+  } catch (error) {
+    (user.resetPasswordToken = undefined),
+      (user.resetPasswordExpire = undefined);
+
+    await user.save({ validateBeforeSave: false });
+
+    res.status(500).json({
+      success: false,
+      messege: error,
+    });
+  }
+}
+
+const resetPassword=async(req,res,next)=>{
+
+const resetPasswordToken=crypto
+  .createHash("sha256")
+  .update(req.params.token)
+  .digest('hex');
+
+
+  const user= UserModel.findOne({
+    resetPasswordToken,
+    resetPasswordExpire:{$gt:Date.now()}
   })
- }
+
+
+  if(!user){
+
+    return res.status(404).json({
+      message:"Reset Password token is invalid or has been expired",
+
+    })
+
+  }
+
+
+  if(req.body.password!==req.body.confirmPassword)
+  return res.status(404).json({
+    message:" Password deesnot match",
+  })
+
+
+  user.password=req.body.password; 
+  user.resetPassword=undefined;
+  user.resetPasswordExpire=undefined;
+
+ 
+  await user.save();
+
+  sendToken(user,200,res)
+
+
+}
+
+
+
+
 
 module.exports = {
   registerUser,
   loginUser,
   logOut,
+  forgotPassword,
+  resetPassword,
 };
