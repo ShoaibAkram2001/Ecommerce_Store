@@ -3,7 +3,7 @@ const bryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const userModel = require("../models/user.model");
 const sendToken = require("../utils/jwtToken");
-const crypto=require('crypto')
+const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 
 console.log(UserModel);
@@ -111,7 +111,10 @@ async function forgotPassword(req, res, next) {
   console.log("User forgot password works");
   const email = req.body.email;
 
+  //console.log("email :",email);
   const user = await UserModel.findOne({ email }).maxTime(2000);
+
+  console.log(user.email);
 
   if (!user)
     return res.status(404).json({
@@ -128,13 +131,16 @@ async function forgotPassword(req, res, next) {
 
   const messege = `Your password reset Token is :-\n\n${resetPasswordUrl}\n\n If you have not requested this email then , please ignore it`;
 
-  await sendEmail({
-    email: user.email,
-    subject: `Ecommerce Password Recovery`,
-    messege,
-  });
+  console.log("Messege :", messege);
 
   try {
+    const send = await sendEmail({
+      email: user.email,
+      subject: `Ecommerce Password Recovery`,
+      messege,
+    });
+
+    console.log(send);
     res.status(200).json({
       message: `Email sent to ${user.email} successfully`,
     });
@@ -151,51 +157,102 @@ async function forgotPassword(req, res, next) {
   }
 }
 
-const resetPassword=async(req,res,next)=>{
+const resetPassword = async (req, res, next) => {
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(req.params.token)
+    .digest("hex");
 
-const resetPasswordToken=crypto
-  .createHash("sha256")
-  .update(req.params.token)
-  .digest('hex');
-
-
-  const user= UserModel.findOne({
+  const user = UserModel.findOne({
     resetPasswordToken,
-    resetPasswordExpire:{$gt:Date.now()}
-  })
+    resetPasswordExpire: { $gt: Date.now() },
+  });
 
-
-  if(!user){
-
+  if (!user) {
     return res.status(404).json({
-      message:"Reset Password token is invalid or has been expired",
-
-    })
-
+      message: "Reset Password token is invalid or has been expired",
+    });
   }
 
+  if (req.body.password !== req.body.confirmPassword)
+    return res.status(404).json({
+      message: " Password dees not match",
+    });
 
-  if(req.body.password!==req.body.confirmPassword)
-  return res.status(404).json({
-    message:" Password deesnot match",
-  })
+  user.password = req.body.password;
+  user.resetPassword = undefined;
+  user.resetPasswordExpire = undefined;
 
-
-  user.password=req.body.password; 
-  user.resetPassword=undefined;
-  user.resetPasswordExpire=undefined;
-
- 
   await user.save();
 
-  sendToken(user,200,res)
+  sendToken(user, 200, res);
+};
+
+async function userDetails(req, res) {
+  //const email=req.body.email;
+
+  const user = await userModel.findById(req.user);
+
+  res.status(200).json({
+    success: true,
+    user,
+  });
+}
+
+async function updatePassword(req, res, next) {
+  try {
+    const user = await userModel.findById(req.user);
+    console.log(user);
+    console.log(req.body.oldPassword);
+
+    const isPasswordMatch = await user.comparePassword(req.body.oldPassword);
+    console.log(isPasswordMatch);
+
+    if (!isPasswordMatch)
+      return res.status(404).json({
+        success: false,
+        message: "old password is incorrect ",
+      });
+
+    if (req.body.newPassword !== req.body.confirmPassword)
+      return res.status(404).json({
+        success: false,
+        message: "Passwords doesnot match ",
+      });
+
+    user.password = req.body.newPassword;
+
+    await user.save();
+
+    sendToken(user, 200, res);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: error,
+    });
+  }
+}
+
+async function updateProfile(req,res,next){
+
+
+  const newUserData={
+   name: req.body.name,
+   email:req.body.email,
+  }
+
+  
+
+  const newUser=await UserModel.findByIdAndUpdate(req.user,newUserData);
+
+   newUser.name=newUserData.name;
+   newUser.email=newUserData.email;
+
+
+   await newUser.save();
 
 
 }
-
-
-
-
 
 module.exports = {
   registerUser,
@@ -203,4 +260,7 @@ module.exports = {
   logOut,
   forgotPassword,
   resetPassword,
+  userDetails,
+  updatePassword,
+  updateProfile,
 };
