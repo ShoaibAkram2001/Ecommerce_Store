@@ -217,7 +217,7 @@ async function updatePassword(req, res, next) {
     if (req.body.newPassword !== req.body.confirmPassword)
       return res.status(404).json({
         success: false,
-        message: "Passwords doesnot match ",
+        message: "Passwords does not match ",
       });
 
     user.password = req.body.newPassword;
@@ -233,26 +233,89 @@ async function updatePassword(req, res, next) {
   }
 }
 
-async function updateProfile(req,res,next){
+async function updateProfile(req, res, next) {
+  console.log("Body data :", req.body);
 
+  const newUserData = {
+    name: req.body.name,
+    email: req.body.email,
 
-  const newUserData={
-   name: req.body.name,
-   email:req.body.email,
-  }
+  };
+  const newUser = await UserModel.findById(req.user);
+  console.log(newUser);
 
-  
+  newUser.name = newUserData.name;
+  newUser.email = newUserData.email;
+  await newUser.save();
 
-  const newUser=await UserModel.findByIdAndUpdate(req.user,newUserData);
-
-   newUser.name=newUserData.name;
-   newUser.email=newUserData.email;
-
-
-   await newUser.save();
-
-
+  console.log(newUser);
+  res.status(200).json({
+    success: true,
+    newUser,
+  });
 }
+//Admin (get All users)
+ async function getAllUsers(req,res){
+const users=await userModel.find();
+
+  res.status(200).json({
+    success:true,
+    users,
+  })
+
+ }
+//updateUserRole
+ async function updateUserRole(req, res, next) {
+  console.log("Body data :", req.body);
+
+  const newUserData = {
+    name: req.body.name,
+    email: req.body.email,
+   role:req.body.role
+  };
+  const newUser = await UserModel.findById(req.user);
+  console.log(newUser);
+
+  newUser.name = newUserData.name;
+  newUser.email = newUserData.email;
+  await newUser.save();
+
+  console.log(newUser);
+  res.status(200).json({
+    success: true,
+    newUser,
+  });
+}
+
+// get Single user(admin)
+ async function getSingleUser(req,res){
+  const user=await userModel.findById(req.params.id);
+
+  if(!user) return `User not found with id : ${req.params.id}`;
+
+
+    res.status(200).json({
+      success:true,
+      user,
+    })
+  
+   }
+
+   
+   async  function deleteUser(req,res){
+
+    const user=await userModel.deleteOne({ _id: req.params.id });
+
+
+    console.log("Deleted user :",user);
+    
+
+    res.status(200).json({
+      success:true,
+
+      messege:"Successfully user Removed",
+    })
+   }
 
 module.exports = {
   registerUser,
@@ -263,4 +326,7 @@ module.exports = {
   userDetails,
   updatePassword,
   updateProfile,
+  getAllUsers,
+  getSingleUser,
+  deleteUser,
 };

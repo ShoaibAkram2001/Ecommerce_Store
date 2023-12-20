@@ -15,7 +15,7 @@ const productSchema = mongoose.Schema({
     required: [true, "Please Enter Product  Price"],
     maxLength: [8, "Pricee can't exceed 8 digits"],
   },
-  rating: {
+  ratings: {
     type: Number,
     default: 0,
   },
@@ -64,6 +64,12 @@ const productSchema = mongoose.Schema({
         type: String,
         required: true,
       },
+      user:{
+        type:mongoose.Schema.ObjectId,
+        ref:"User",
+        required:true,
+      
+       },
     },
   ],
   // which user created this product

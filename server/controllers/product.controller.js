@@ -101,9 +101,68 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+
+async function createProductReview(){
+
+  const {comment,rating,productId}=req.body;
+
+  console.log("Review Object is :",req.user);
+  const review={
+    user:req.user._id,
+    name:req.user.name,
+    rating:Number(rating),
+    comment,
+
+  }
+
+  const product=await productModel.findById(productId);
+  const isReviewed=product.reviews(rev=>rev.user.toString()===req.user.toString());
+
+
+  if(isReviewed)
+  {
+    
+    product.reviews.forEach(rev => {
+      if(rev.user.toString()===req.user.toString())
+
+      (rev.ratings=rating,rev.comment=comment) 
+      
+      
+    });
+   
+
+
+
+  }
+  else{
+
+    
+
+      product.reviews.push(review);
+     product.numOfReviews= product.reviews.length
+
+  }
+
+  let avg=0;
+
+  product.ratings=product.reviews.forEach(async(rev)=>{
+   avg +=rev.rating;
+
+   await product.save({validateBeforeSave:false});
+  })
+
+  res.status(200).json({
+    success:true,
+  })
+}
+
+
+
+
 module.exports = {
   getAllProducts,
   createProduct,
   updateProduct,
   deleteProduct,
+  createProductReview,
 };
